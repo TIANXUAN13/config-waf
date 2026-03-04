@@ -1,0 +1,7 @@
+资产组ID,站点是否启用,防护站点名称,服务器地址,绑定域名,防护策略ID,备注信息,源IP获取方式,代理IP或者IP组ID
+asset_group,is_enabled,name,addrs,server_names,policy_group,remark,detector_ip_source,proxy_ip_list_or_proxy_group
+1,是,test-001,1.1.1.1:80,*.a.cn，*,3,,"rightmost_non_proxy_ip, Can-Src, Socket","1.1.1.1, 2.2.2.2"
+1,是,test-002,"2.2.2.2:80, 3.3.3.3",*.b.cn，*,3,测试,"X-Forwarded-For:-1, Cdn-Src, Socket",
+1,是,test-003,4.4.4.4,"*.c.cn,  d.*，*",3,测试,"rightmost_non_proxy_ip, Socket","1,2"
+1,是,test-004,"5.5.5.5:443,  6.6.6.6,  7.7.7.7:8080","*.e.cn, f.*,*",3,测试,Socket,
+2,否,test-005,8.8.8.8:443,"*.g.cn, h.*, g.cn, *",5,,,

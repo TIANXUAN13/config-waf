@@ -1,0 +1,8 @@
+资产组ID,站点是否启用,防护站点名称,绑定域名,绑定端口,TCP转发,HTTPS站点,SSL证书ID,HTTP2,SNI转发,后端Server,工作组名,工作组IP,防护策略ID,备注信息,源IP获取方式,代理IP或者IP组ID
+asset_group,is_enabled,name,server_names,ports,non_http,ssl,ssl_cert,http2,sni,backend_config,interface,ip,policy_group,remark,detector_ip_source,proxy_ip_list_or_proxy_group
+1,是,test-001,*.a.cn，*,1443,否,是,1,是,是,"Round Robin, https://1.1.1.1:443 10,  https://1.1.1.1:8080 20",virtual,"0.0.0.0, ::",3,测试,"rightmost_non_proxy_ip, X-Forwarded-For:-1, Socket","1.1.1.1,  2.2.2.2"
+1,是,test-002,*.b.cn，*,8086,否,否,0,否,否,"Least Connected, http://g.cn:8080",virtual,"0.0.0.0, ::",3,测试,"X-Forwarded-For:-1, Cdn-Src, Socket",
+2,是,test-003,"*.c.cn,  d.*，*",3443,否,是,1,否,是,"Hash, http://g.cn:80, http://g.cn:8080",virtual,"0.0.0.0, ::",3,测试,"rightmost_non_proxy_ip,  Socket","1, 2"
+2,是,test-004,"*.e.cn, f.*,*","80,818,082",否,是,1,否,是,"Round Robin, http://g.cn:80",virtual,"0.0.0.0, ::",3,测试,Socket,
+2,否,test-005,"*.g.cn, h.*, g.cn, *","6443， 7443, 8443",否,是,1,是,否,"IP Hash, https://[fe80::73d7:5f94:6f51:dd1a]:443",virtual,"0.0.0.0, ::",3,测试,,
+2,是,test-006,"*,d.g.cn",9090,是,否,0,否,否,"Session Sticky, 600, https://g.cn:80",virtual,"0.0.0.0, ::",3,,,
