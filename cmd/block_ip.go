@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 
@@ -88,6 +89,44 @@ type aclIpResp struct {
 	Msg interface{} `json:"msg"`
 }
 
+type ipGroupDetailResp struct {
+	Err  interface{} `json:"err"`
+	Data struct {
+		Items []ipGroupDetailItem `json:"items"`
+		Total int                 `json:"total"`
+	} `json:"data"`
+	Msg interface{} `json:"msg"`
+}
+
+type ipGroupDetailItem struct {
+	ID       int      `json:"id"`
+	Name     string   `json:"name"`
+	Comment  string   `json:"comment"`
+	Cidrs    []string `json:"cidrs"`
+	Original []string `json:"original"`
+}
+
+func getAllIpGroupDetails(cli *api.API) ([]ipGroupDetailItem, error) {
+	ipGroupCli := ipgroup.New(cli.BaseUrl, cli.Token)
+	count := 200
+	out := make([]ipGroupDetailItem, 0, count)
+	for offset := 0; ; offset += count {
+		b, err := ipGroupCli.ListDetail(count, offset)
+		if ok, err := api.OK2(b, err); !ok {
+			return nil, err
+		}
+		resp := &ipGroupDetailResp{}
+		if err := json.Unmarshal(b, resp); err != nil {
+			return nil, err
+		}
+		out = append(out, resp.Data.Items...)
+		if offset+len(resp.Data.Items) >= resp.Data.Total || len(resp.Data.Items) == 0 {
+			break
+		}
+	}
+	return out, nil
+}
+
 func getIpId(cli *acl.API, aclId int, targets ...string) []int {
 	b, err := cli.GetIp(aclId)
 	if ok, err := api.OK2(b, err); !ok {
@@ -143,6 +182,29 @@ func DisplayIpByAclRuleId(cli *api.API, id int) {
 	for _, r := range resp.Data {
 		fmt.Println(r.Target)
 	}
+}
+
+func DisplayIpByIpGroupId(cli *api.API, id int) error {
+	items, err := getAllIpGroupDetails(cli)
+	if err != nil {
+		return err
+	}
+	for _, item := range items {
+		if item.ID != id {
+			continue
+		}
+		if len(item.Cidrs) > 0 {
+			for _, v := range item.Cidrs {
+				fmt.Println(v)
+			}
+			return nil
+		}
+		for _, v := range item.Original {
+			fmt.Println(v)
+		}
+		return nil
+	}
+	return errors.New("ipgroup not found")
 }
 
 func CreateAclRule(cli *api.API, name string, expire int, targets ...string) ([]byte, error) {

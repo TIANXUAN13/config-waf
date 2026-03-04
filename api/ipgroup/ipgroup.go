@@ -1,6 +1,9 @@
 package ipgroup
 
 import (
+	"net/url"
+	"strconv"
+
 	"safeline/api"
 )
 
@@ -52,4 +55,13 @@ func (cli API) DeleteIp(id int, targets ...string) ([]byte, error) {
 		Targets []string `json:"targets"`
 	}{id, targets}
 	return cli.API.Delete(data)
+}
+
+func (cli API) ListDetail(count, offset int) ([]byte, error) {
+	cli.URI = "/api/FilterV2API"
+	query := url.Values{}
+	query.Set("count", strconv.Itoa(count))
+	query.Set("offset", strconv.Itoa(offset))
+	query.Set("scope", "detect:asset:ip_group")
+	return cli.Get(query)
 }

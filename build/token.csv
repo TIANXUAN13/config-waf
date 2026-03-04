@@ -1,5 +1,2 @@
 addr,token,"部署模式（1: 透明桥, 2: 透明代理, 3: 硬件反代，4：软件反代，5：其它）"
-https://nfs:9443, xxxxxxxxx, 4
-https://sl1.pl.in.chaitin.net,xxxxxxxxx,3
-https://sl3.pl.in.chaitin.net,xxxxxxxxx,2
-https://sl4.pl.in.chaitin.net,xxxxxxxxx,1
+https://192.168.24.55:9443,bOnhkKahz78R4WNxWRFfbcvYSuZ0TAZfKRBJREMB,4

@@ -65,7 +65,7 @@ func cmdLs(nameSpace string, tokens *[][]string, n *time.Duration) *cli.Command 
 					}
 					u, _ := url.Parse(t[0])
 					name := fmt.Sprintf("%s_%s.%s", saveName, u.Hostname(), format)
-					f, err := os.OpenFile(name, os.O_CREATE|os.O_WRONLY, 0644)
+					f, err := os.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 					panicIf(err)
 					w = append(w, f)
 				} else {
@@ -219,6 +219,118 @@ func cmdGetIp(tokens *[][]string, n *time.Duration) *cli.Command {
 				client := api.NewWithTimeout(t[0], t[1], "", *n)
 				fmt.Printf(">>> %s\n", t[0])
 				DisplayIpByAclRuleId(client, id)
+				fmt.Println("<<<")
+			}
+			return nil
+		},
+	}
+}
+
+func cmdGetIpByIpGroup(tokens *[][]string, n *time.Duration) *cli.Command {
+	return &cli.Command{
+		Name:  "getip",
+		Usage: "查询IP组内IP",
+		Flags: []cli.Flag{
+			&cli.IntFlag{
+				Name:     "byid",
+				Usage:    "通过`ID`定位",
+				Required: true,
+			},
+		},
+		Action: func(ctx *cli.Context) error {
+			id := ctx.Int("byid")
+			for _, t := range *tokens {
+				client := api.NewWithTimeout(t[0], t[1], "", *n)
+				fmt.Printf(">>> %s\n", t[0])
+				if err := DisplayIpByIpGroupId(client, id); err != nil {
+					_, _ = fmt.Fprintf(os.Stderr, "[error] %v\n", err.Error())
+				}
+				fmt.Println("<<<")
+			}
+			return nil
+		},
+	}
+}
+
+func cmdAllIpByIpGroup(tokens *[][]string, n *time.Duration) *cli.Command {
+	return &cli.Command{
+		Name:  "allip",
+		Usage: "联合查询所有IP组及IP",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "output",
+				Aliases: []string{"o"},
+				Usage:   "write to `FILE` instead of stdout",
+			}, &cli.BoolFlag{
+				Name:    "raw",
+				Aliases: []string{"r"},
+				Usage:   "return json",
+			},
+		},
+		Action: func(ctx *cli.Context) error {
+			var w []*os.File
+			saveName := ctx.String("output")
+			raw := ctx.Bool("raw")
+			for _, t := range *tokens {
+				if saveName != "" {
+					format := "csv"
+					if raw {
+						format = "json"
+					}
+					u, _ := url.Parse(t[0])
+					name := fmt.Sprintf("%s_%s.%s", saveName, u.Hostname(), format)
+					f, err := os.OpenFile(name, os.O_CREATE|os.O_WRONLY, 0644)
+					panicIf(err)
+					w = append(w, f)
+				} else {
+					w = append(w, os.Stdout)
+				}
+			}
+			if saveName != "" {
+				defer func() {
+					for _, v := range w {
+						v.Close()
+					}
+				}()
+			}
+			for idx, t := range *tokens {
+				client := api.NewWithTimeout(t[0], t[1], "", *n)
+				fmt.Printf(">>> %s\n", t[0])
+				if err := DisplayIpGroupAllIp(client, w[idx], raw); err != nil {
+					_, _ = fmt.Fprintf(os.Stderr, "[error] %v\n", err.Error())
+				}
+				fmt.Println("<<<")
+			}
+			return nil
+		},
+	}
+}
+
+func cmdExportIpByIpGroup(tokens *[][]string, n *time.Duration) *cli.Command {
+	return &cli.Command{
+		Name:  "exportip",
+		Usage: "导出IP组及IP明细",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "filename",
+				Aliases:  []string{"f"},
+				Usage:    "保存的文件名（不含后缀）",
+				Required: true,
+			}, &cli.StringFlag{
+				Name:  "format",
+				Usage: "导出格式（csv/json）",
+				Value: "csv",
+			},
+		},
+		Action: func(ctx *cli.Context) error {
+			filename := ctx.String("filename")
+			format := ctx.String("format")
+			for _, t := range *tokens {
+				client := api.NewWithTimeout(t[0], t[1], "", *n)
+				fmt.Printf(">>> %s\n", t[0])
+				if err := ExportIpGroupIP(client, filename, format); err != nil {
+					_, _ = fmt.Fprintf(os.Stderr, "[error] %v\n", err.Error())
+				}
 				fmt.Println("<<<")
 			}
 			return nil
@@ -674,6 +786,9 @@ func main() {
 				Usage: "IP组",
 				Subcommands: []*cli.Command{
 					cmdLs("ipgroup", &tokens, timeout),
+					cmdGetIpByIpGroup(&tokens, timeout),
+					cmdAllIpByIpGroup(&tokens, timeout),
+					cmdExportIpByIpGroup(&tokens, timeout),
 					cmdAddIp("ipgroup", &tokens, timeout),
 					cmdDelIp("ipgroup", &tokens, timeout),
 					cmdCreateIpGroup(&tokens, timeout),

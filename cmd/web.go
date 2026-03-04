@@ -721,6 +721,8 @@ const webIndexHTML = `<!doctype html>
         <button class="chip" data-cmd="cert ls">证书列表</button>
         <button class="chip" data-cmd="assetgroup ls">资产组列表</button>
         <button class="chip" data-cmd="ipgroup ls">IP组列表</button>
+        <button class="chip" data-cmd="ipgroup getip --byid 1">IP组查询IP</button>
+        <button class="chip" data-cmd="ipgroup allip">IP组联合查询</button>
         <button class="chip" data-cmd="acl ls">ACL列表</button>
         <button class="chip" data-cmd="acl getip --byid 1">ACL查询IP</button>
         <button class="chip" data-cmd="global-rule ls">全局规则列表</button>
@@ -745,6 +747,7 @@ const webIndexHTML = `<!doctype html>
       <label>导出/导入信息</label>
       <div class="chips">
         <button class="chip" data-cmd="website export -f template">导出站点模板</button>
+        <button class="chip" data-cmd="ipgroup exportip -f ipgroup_ips --format csv">导出IP组IP</button>
         <button class="chip" data-cmd="global-rule export -f global_rules">导出全局规则</button>
         <button class="chip" data-cmd="global-rule import -f global_rules.json">导入全局规则</button>
         <button class="chip" data-cmd="custom-rule export -f custom_rules">导出站点规则</button>
