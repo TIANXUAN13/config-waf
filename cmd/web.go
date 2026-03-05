@@ -26,12 +26,12 @@ func cmdWeb() *cli.Command {
 		Name:  "web",
 		Usage: "启动 Web 管理页面",
 		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "listen", Value: "127.0.0.1:8090", Usage: "监听地址，如 127.0.0.1:8090"},
+			&cli.StringFlag{Name: "listen", Value: "127.0.0.1:28000", Usage: "监听地址，如 127.0.0.1:28000"},
 		},
 		Action: func(ctx *cli.Context) error {
 			listen := strings.TrimSpace(ctx.String("listen"))
 			if listen == "" {
-				listen = "127.0.0.1:8090"
+				listen = "127.0.0.1:28000"
 			}
 
 			mux := http.NewServeMux()

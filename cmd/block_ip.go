@@ -110,10 +110,31 @@ func getAllIpGroupDetails(cli *api.API) ([]ipGroupDetailItem, error) {
 	ipGroupCli := ipgroup.New(cli.BaseUrl, cli.Token)
 	count := 200
 	out := make([]ipGroupDetailItem, 0, count)
+	scopeCandidates := []string{"detect:asset:ip_group", "detect:ip_group"}
+	activeScope := ""
 	for offset := 0; ; offset += count {
-		b, err := ipGroupCli.ListDetail(count, offset)
-		if ok, err := api.OK2(b, err); !ok {
-			return nil, err
+		var b []byte
+		var err error
+		if activeScope != "" {
+			b, err = ipGroupCli.ListDetail(count, offset, activeScope)
+			if ok, err := api.OK2(b, err); !ok {
+				return nil, err
+			}
+		} else {
+			var lastErr error
+			for _, scope := range scopeCandidates {
+				b, err = ipGroupCli.ListDetail(count, offset, scope)
+				if ok, err := api.OK2(b, err); ok {
+					activeScope = scope
+					lastErr = nil
+					break
+				} else {
+					lastErr = err
+				}
+			}
+			if activeScope == "" {
+				return nil, lastErr
+			}
 		}
 		resp := &ipGroupDetailResp{}
 		if err := json.Unmarshal(b, resp); err != nil {

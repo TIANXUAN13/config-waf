@@ -57,11 +57,15 @@ func (cli API) DeleteIp(id int, targets ...string) ([]byte, error) {
 	return cli.API.Delete(data)
 }
 
-func (cli API) ListDetail(count, offset int) ([]byte, error) {
+func (cli API) ListDetail(count, offset int, scopes ...string) ([]byte, error) {
 	cli.URI = "/api/FilterV2API"
+	scope := "detect:asset:ip_group"
+	if len(scopes) > 0 && scopes[0] != "" {
+		scope = scopes[0]
+	}
 	query := url.Values{}
 	query.Set("count", strconv.Itoa(count))
 	query.Set("offset", strconv.Itoa(offset))
-	query.Set("scope", "detect:asset:ip_group")
+	query.Set("scope", scope)
 	return cli.Get(query)
 }

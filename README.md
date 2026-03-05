@@ -11,17 +11,17 @@ safeline
 Web 页面通过调用原始 CLI 命令实现功能，因此可覆盖本文档中的所有能力（站点、策略、IP组、证书、ACL、全局/站点规则导入导出等）。
 
 ```shell
-# 默认监听 127.0.0.1:8090
+# 默认监听 127.0.0.1:28000
 ./safeline-darwin web
 
 # 指定监听地址
-./safeline-darwin web --listen 0.0.0.0:8090
+./safeline-darwin web --listen 0.0.0.0:28000
 ```
 
 打开浏览器访问：
 
 ```text
-http://127.0.0.1:8090
+http://127.0.0.1:28000
 ```
 
 页面提供：
@@ -36,6 +36,7 @@ http://127.0.0.1:8090
 - 编译全部平台（darwin/linux/windows，amd64/arm64）
 - 交互式数字选择运行方式
 - 直接运行源码或本机二进制
+- 未显式传 `--config` 时，自动使用 `build/token.csv`
 
 ```shell
 # 交互菜单（按数字选择）
@@ -44,11 +45,17 @@ http://127.0.0.1:8090
 # 编译全部平台
 ./build/run.sh --build-all
 
+# 编译指定平台架构（示例：linux/arm64）
+./build/run.sh --build-target linux arm64
+
+# macOS 也支持用 mac 别名
+./build/run.sh --build-target mac arm64
+
 # 直接运行源码
 ./build/run.sh --run-source ipgroup allip
 
 # 运行本机二进制（不存在会先编译）
-./build/run.sh --run-host web --listen 0.0.0.0:8090
+./build/run.sh --run-host web --listen 0.0.0.0:28000
 
 # 编号选择已有二进制并运行
 ./build/run.sh --pick-run ipgroup ls
