@@ -39,6 +39,7 @@ func cmdWeb() *cli.Command {
 			mux.HandleFunc("/api/run", handleWebRun)
 			mux.HandleFunc("/api/run-stream", handleWebRunStream)
 			mux.HandleFunc("/api/files", handleWebFiles)
+			mux.HandleFunc("/api/files/delete", handleWebDeleteFiles)
 			mux.HandleFunc("/api/upload", handleWebUpload)
 			mux.HandleFunc("/api/download", handleWebDownload)
 
@@ -72,8 +73,13 @@ type webRunResponse struct {
 
 type webFileItem struct {
 	Name    string `json:"name"`
+	Dir     string `json:"dir"`
 	Size    int64  `json:"size"`
 	ModTime string `json:"mod_time"`
+}
+
+type webDeleteFilesRequest struct {
+	Names []string `json:"names"`
 }
 
 type webRunStreamEvent struct {
@@ -344,8 +350,10 @@ func handleWebFiles(w http.ResponseWriter, r *http.Request) {
 			if relPrefix != "" {
 				displayName = filepath.ToSlash(filepath.Join(relPrefix, name))
 			}
+			absDir, _ := filepath.Abs(baseDir)
 			files = append(files, webFileItem{
 				Name:    displayName,
+				Dir:     filepath.ToSlash(absDir),
 				Size:    entry.Size(),
 				ModTime: entry.ModTime().Format(time.RFC3339),
 			})
@@ -395,6 +403,40 @@ func handleWebUpload(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{"status": "ok", "file": name})
 }
 
+func handleWebDeleteFiles(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req webDeleteFilesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid json: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if len(req.Names) == 0 {
+		http.Error(w, "no file selected", http.StatusBadRequest)
+		return
+	}
+	removed := make([]string, 0, len(req.Names))
+	failed := make(map[string]string)
+	for _, name := range req.Names {
+		path, err := resolveFilePath(name)
+		if err != nil {
+			failed[name] = err.Error()
+			continue
+		}
+		if err = os.Remove(path); err != nil {
+			failed[name] = err.Error()
+			continue
+		}
+		removed = append(removed, name)
+	}
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"removed": removed,
+		"failed":  failed,
+	})
+}
+
 func handleWebDownload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -405,7 +447,7 @@ func handleWebDownload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing name", http.StatusBadRequest)
 		return
 	}
-	path, err := resolveDownloadPath(name)
+	path, err := resolveFilePath(name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -415,7 +457,7 @@ func handleWebDownload(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, path)
 }
 
-func resolveDownloadPath(name string) (string, error) {
+func resolveFilePath(name string) (string, error) {
 	clean := filepath.Clean(name)
 	if strings.HasPrefix(clean, "..") || filepath.IsAbs(clean) {
 		return "", fmt.Errorf("invalid file path")
@@ -549,6 +591,9 @@ const webIndexHTML = `<!doctype html>
       grid-template-columns: 1.2fr 1fr;
       gap: 12px;
     }
+    .grid.file-card-hidden {
+      grid-template-columns: 1fr;
+    }
     .card {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -626,6 +671,9 @@ const webIndexHTML = `<!doctype html>
       font-size: 12px;
       line-height: 1.5;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
     }
     .status { font-size: 12px; margin-top: 8px; }
     .ok { color: var(--ok); }
@@ -648,6 +696,7 @@ const webIndexHTML = `<!doctype html>
     }
     th { background: #f8fafc; }
     .small { font-size: 12px; color: var(--muted); }
+    .hidden { display: none; }
     @media (max-width: 960px) {
       .grid { grid-template-columns: 1fr; }
     }
@@ -660,18 +709,12 @@ const webIndexHTML = `<!doctype html>
     <p>页面会将操作转换为原始 safeline CLI 命令执行，覆盖 README 中的所有能力。</p>
   </div>
 
-  <div class="grid">
+  <div class="grid" id="mainGrid">
     <div class="card">
       <h2>全局参数</h2>
-      <div class="row">
-        <div>
-          <label>config（默认 token.csv）</label>
-          <input id="config" value="token.csv" />
-        </div>
-        <div>
-          <label>match（可选）</label>
-          <input id="match" placeholder="如 169.254.0.4" />
-        </div>
+      <div>
+        <label>config（默认 token.csv）</label>
+        <input id="config" value="token.csv" />
       </div>
       <div class="row">
         <div>
@@ -697,20 +740,18 @@ const webIndexHTML = `<!doctype html>
           <select id="debug"><option value="false">false</option><option value="true">true</option></select>
         </div>
       </div>
-      <div class="row">
-        <div>
-          <label>当前模式（website 命令）</label>
-          <select id="mode">
-            <option value="HardwareReverseProxy">HardwareReverseProxy</option>
-            <option value="SoftwareReverseProxy">SoftwareReverseProxy</option>
-            <option value="TransparentProxy">TransparentProxy</option>
-            <option value="TransparentBridge">TransparentBridge</option>
-          </select>
-        </div>
-        <div>
-          <label>模式应用规则</label>
-          <input value="website 命令未显式传 --mode 时，自动使用这里的值" disabled />
-        </div>
+      <div>
+        <label>当前模式（仅 website 命令使用）</label>
+        <select id="mode">
+          <option value="HardwareReverseProxy">HardwareReverseProxy</option>
+          <option value="SoftwareReverseProxy">SoftwareReverseProxy</option>
+          <option value="TransparentProxy">TransparentProxy</option>
+          <option value="TransparentBridge">TransparentBridge</option>
+        </select>
+      </div>
+      <div>
+        <button id="checkConn" class="btn sub">连接校验</button>
+        <button id="toggleFileCard" class="btn sub">收起文件管理</button>
       </div>
 
       <h2>命令构建器</h2>
@@ -765,21 +806,22 @@ const webIndexHTML = `<!doctype html>
       <pre id="output">$ 输出会显示在这里</pre>
     </div>
 
-    <div class="card">
+    <div class="card" id="fileCard">
       <h2>文件管理（模板/导入导出）</h2>
-      <p class="small">可上传 CSV/JSON 文件；导出的文件可在列表里直接下载。系统也会展示 build/templates 下的模板。</p>
+      <p class="small">可上传 CSV/JSON 文件；支持显示目录、勾选删除、列表折叠。系统也会展示 build/templates 下的模板。</p>
 
       <form id="uploadForm">
         <label>上传文件</label>
         <input type="file" id="file" name="file" />
         <button class="btn" type="submit">上传</button>
         <button class="btn sub" id="refreshFiles" type="button">刷新列表</button>
+        <button class="btn sub" id="deleteSelectedFiles" type="button">删除所选</button>
       </form>
 
-      <div class="files">
+      <div class="files" id="filesPanel">
         <table>
           <thead>
-          <tr><th>文件</th><th>大小</th><th>修改时间</th></tr>
+          <tr><th>选择</th><th>文件</th><th>大小</th><th>修改时间</th></tr>
           </thead>
           <tbody id="fileRows"></tbody>
         </table>
@@ -792,7 +834,7 @@ const webIndexHTML = `<!doctype html>
 const output = document.getElementById('output');
 const statusEl = document.getElementById('status');
 const STORAGE_KEY = 'safeline_web_global_config_v1';
-const CONFIG_FIELDS = ['config', 'addr', 'token', 'match', 'mode', 'timeout', 'exec_timeout', 'debug', 'command'];
+const CONFIG_FIELDS = ['config', 'addr', 'token', 'mode', 'timeout', 'exec_timeout', 'debug', 'command'];
 
 function esc(text) {
   return text
@@ -811,7 +853,6 @@ function currentFormState() {
     config: document.getElementById('config').value.trim(),
     addr: document.getElementById('addr').value.trim(),
     token: document.getElementById('token').value.trim(),
-    match: document.getElementById('match').value.trim(),
     mode: document.getElementById('mode').value,
     timeout: document.getElementById('timeout').value || '5',
     exec_timeout: document.getElementById('exec_timeout').value || '300',
@@ -847,25 +888,34 @@ function clearConfigStorage() {
 }
 
 async function runCmd() {
+  const cmd = document.getElementById('command').value.trim();
+  if (!cmd) {
+    setStatus('命令不能为空', false);
+    return;
+  }
+  await executeCommand(cmd, '执行命令');
+}
+
+async function checkConn() {
+  await executeCommand('policy ls -r', '连接校验');
+}
+
+async function executeCommand(command, actionName) {
   saveConfigToStorage();
   const req = {
     config: document.getElementById('config').value.trim(),
     addr: document.getElementById('addr').value.trim(),
     token: document.getElementById('token').value.trim(),
-    match: document.getElementById('match').value.trim(),
+    match: '',
     mode: document.getElementById('mode').value,
     timeout: parseInt(document.getElementById('timeout').value || '5', 10),
     exec_timeout: parseInt(document.getElementById('exec_timeout').value || '300', 10),
     debug: document.getElementById('debug').value === 'true',
-    command: document.getElementById('command').value.trim(),
+    command,
   };
-  if (!req.command) {
-    setStatus('命令不能为空', false);
-    return;
-  }
 
   setStatus('执行中...');
-  output.textContent = '$ safeline ' + req.command + '\n';
+  output.textContent = '$ ' + actionName + '\n$ safeline ' + req.command + '\n';
   const appendOutput = (txt) => {
     output.textContent += txt;
     output.scrollTop = output.scrollHeight;
@@ -916,7 +966,11 @@ async function runCmd() {
       appendOutput('\n$ duration_ms: ' + (finalEvent.duration_ms || 0) + '\n');
       if (finalEvent.error) appendOutput('$ error: ' + finalEvent.error + '\n');
       appendOutput('$ exit_code: ' + (finalEvent.exit_code ?? 0) + '\n');
-      setStatus(finalEvent.error ? '执行完成（有错误）' : '执行完成', !finalEvent.error);
+      if (actionName === '连接校验') {
+        setStatus(finalEvent.error ? '连接校验失败' : '连接校验成功', !finalEvent.error);
+      } else {
+        setStatus(finalEvent.error ? '执行完成（有错误）' : '执行完成', !finalEvent.error);
+      }
     } else {
       setStatus('执行完成（未收到结束事件）', false);
     }
@@ -929,20 +983,68 @@ async function runCmd() {
 
 async function loadFiles() {
   const rows = document.getElementById('fileRows');
-  rows.innerHTML = '<tr><td colspan="3">加载中...</td></tr>';
+  rows.innerHTML = '<tr><td colspan="4">加载中...</td></tr>';
   try {
     const res = await fetch('/api/files');
     const data = await res.json();
     if (!Array.isArray(data) || data.length === 0) {
-      rows.innerHTML = '<tr><td colspan="3">暂无文件</td></tr>';
+      rows.innerHTML = '<tr><td colspan="4">暂无文件</td></tr>';
       return;
     }
     rows.innerHTML = data.map(item => {
-      const link = '<a href="/api/download?name=' + encodeURIComponent(item.name) + '">' + esc(item.name) + '</a>';
-      return '<tr><td>' + link + '</td><td>' + item.size + '</td><td>' + esc(item.mod_time) + '</td></tr>';
+      const name = encodeURIComponent(item.name);
+      const checkbox = '<input type="checkbox" class="file-select" value="' + name + '" />';
+      const link = '<a href="/api/download?name=' + name + '">' + esc(item.name) + '</a>';
+      return '<tr><td>' + checkbox + '</td><td>' + link + '</td><td>' + item.size + '</td><td>' + esc(item.mod_time) + '</td></tr>';
     }).join('');
   } catch (err) {
-    rows.innerHTML = '<tr><td colspan="3">加载失败: ' + esc(String(err)) + '</td></tr>';
+    rows.innerHTML = '<tr><td colspan="4">加载失败: ' + esc(String(err)) + '</td></tr>';
+  }
+}
+
+function toggleFileCard() {
+  const grid = document.getElementById('mainGrid');
+  const card = document.getElementById('fileCard');
+  const btn = document.getElementById('toggleFileCard');
+  if (!grid || !card || !btn) return;
+  const hide = !card.classList.contains('hidden');
+  if (hide) {
+    card.classList.add('hidden');
+    grid.classList.add('file-card-hidden');
+    btn.textContent = '展开文件管理';
+  } else {
+    card.classList.remove('hidden');
+    grid.classList.remove('file-card-hidden');
+    btn.textContent = '收起文件管理';
+  }
+}
+
+async function deleteSelectedFiles() {
+  const selected = Array.from(document.querySelectorAll('.file-select:checked')).map(el => decodeURIComponent(el.value));
+  if (selected.length === 0) {
+    setStatus('请先勾选要删除的文件', false);
+    return;
+  }
+  if (!window.confirm('确认删除所选文件？')) {
+    return;
+  }
+  try {
+    const res = await fetch('/api/files/delete', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ names: selected }),
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(txt || ('HTTP ' + res.status));
+    }
+    const data = await res.json();
+    const removed = Array.isArray(data.removed) ? data.removed.length : 0;
+    const failed = data.failed ? Object.keys(data.failed).length : 0;
+    setStatus('删除完成: 成功 ' + removed + ' 个，失败 ' + failed + ' 个', failed === 0);
+    await loadFiles();
+  } catch (err) {
+    setStatus('删除失败: ' + err, false);
   }
 }
 
@@ -970,6 +1072,7 @@ async function uploadFile(e) {
 }
 
 document.getElementById('run').addEventListener('click', runCmd);
+document.getElementById('checkConn').addEventListener('click', checkConn);
 document.getElementById('clear').addEventListener('click', () => {
   output.textContent = '$ 输出会显示在这里';
   setStatus('已清空输出');
@@ -979,7 +1082,6 @@ document.getElementById('clearCache').addEventListener('click', () => {
   document.getElementById('config').value = 'token.csv';
   document.getElementById('addr').value = '';
   document.getElementById('token').value = '';
-  document.getElementById('match').value = '';
   document.getElementById('mode').value = 'HardwareReverseProxy';
   document.getElementById('timeout').value = '5';
   document.getElementById('exec_timeout').value = '300';
@@ -989,6 +1091,8 @@ document.getElementById('clearCache').addEventListener('click', () => {
 });
 document.getElementById('uploadForm').addEventListener('submit', uploadFile);
 document.getElementById('refreshFiles').addEventListener('click', loadFiles);
+document.getElementById('toggleFileCard').addEventListener('click', toggleFileCard);
+document.getElementById('deleteSelectedFiles').addEventListener('click', deleteSelectedFiles);
 document.querySelectorAll('.chip').forEach(el => {
   el.addEventListener('click', () => {
     document.getElementById('command').value = el.dataset.cmd || '';
