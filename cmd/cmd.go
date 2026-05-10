@@ -564,7 +564,7 @@ func cmdUpdateWebsite(tokens *[][]string, n *time.Duration) *cli.Command {
 				Usage: `选择更新的字段 e.g. "0,1,2"
 	0：站点是否启用（21及以上版本支持）
 	1：防护策略ID
-	2：源IP获取方式
+	2：源IP获取方式（同时更新源IP获取方式来源）
 	3：SSL证书ID
 	4：工作组（透明代理与硬件反代模式）
 	5：web资产组ID

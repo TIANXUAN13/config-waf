@@ -100,6 +100,9 @@ func UpdateTransparentBridgeWebsite(cli *tbridge.API, data *tbridge.Data, limit 
 				b, err = sjson.SetBytes(b, "detector_ip_source", data.IPSource.DetectorIPSource)
 				b, err = sjson.SetBytes(b, "proxy_ip_list", data.IPSource.ProxyIPList)
 				b, err = sjson.SetBytes(b, "proxy_ip_groups", data.IPSource.ProxyIPGroups)
+				if data.DetectorIPSourceFrom != "" {
+					b, err = sjson.SetBytes(b, "detector_ip_source_from", data.DetectorIPSourceFrom)
+				}
 			case 5:
 				b, err = sjson.SetBytes(b, "asset_group", data.AssetGroup)
 			//case 0:
@@ -163,6 +166,9 @@ func UpdateTransparentProxyWebsite(cli *tproxy.API, data *tproxy.ConfigOption, l
 				b, err = sjson.SetBytes(b, "detector_ip_source", data.IPSource.DetectorIPSource)
 				b, err = sjson.SetBytes(b, "proxy_ip_list", data.IPSource.ProxyIPList)
 				b, err = sjson.SetBytes(b, "proxy_ip_groups", data.IPSource.ProxyIPGroups)
+				if data.DetectorIPSourceFrom != "" {
+					b, err = sjson.SetBytes(b, "detector_ip_source_from", data.DetectorIPSourceFrom)
+				}
 			case 3:
 				if data.Addrs[0].Ssl {
 					b, err = sjson.SetBytes(b, "ssl_cert", data.SslCert)
@@ -238,6 +244,9 @@ func UpdateHardwareReverseProxyWebsite(cli *hproxy.API, data *hproxy.ConfigOptio
 				b, err = sjson.SetBytes(b, "detector_ip_source", data.IPSource.DetectorIPSource)
 				b, err = sjson.SetBytes(b, "proxy_ip_list", data.IPSource.ProxyIPList)
 				b, err = sjson.SetBytes(b, "proxy_ip_groups", data.IPSource.ProxyIPGroups)
+				if data.DetectorIPSourceFrom != "" {
+					b, err = sjson.SetBytes(b, "detector_ip_source_from", data.DetectorIPSourceFrom)
+				}
 			case 3:
 				if data.Ports[0].Ssl {
 					b, err = sjson.SetBytes(b, "ssl_cert", data.SslCert)

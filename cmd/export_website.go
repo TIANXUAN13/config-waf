@@ -6,6 +6,7 @@ import (
 	"fmt"
 	urlpkg "net/url"
 	"os"
+	"strings"
 
 	"safeline/api"
 	"safeline/api/website/hproxy"
@@ -25,7 +26,29 @@ func openFile(cli *api.API, filename string) (*os.File, *csv.Writer) {
 	return f, w
 }
 
+// hasDetectorIPSourceFrom checks if the API response contains detector_ip_source_from (version 25+)
+func hasDetectorIPSourceFrom(b []byte) bool {
+	return strings.Contains(string(b), `"detector_ip_source_from"`)
+}
+
+// insertIPSourceFromHeader inserts the detector_ip_source_from column before detector_ip_source
+func insertIPSourceFromHeader(headers [][]string) [][]string {
+	result := make([][]string, 0, len(headers)+1)
+	for _, h := range headers {
+		if h[1] == "detector_ip_source" {
+			result = append(result, []string{"源 IP 获取方式来源", "detector_ip_source_from"})
+		}
+		result = append(result, h)
+	}
+	return result
+}
+
 func exportTransparentBridgeWebsite(cli *api.API, filename, mode string) {
+	b, err := getWebsite(cli, mode)
+	panicIf(err)
+
+	v25 := hasDetectorIPSourceFrom(b)
+
 	f, w := openFile(cli, filename)
 	defer f.Close()
 	defer w.Flush()
@@ -40,6 +63,9 @@ func exportTransparentBridgeWebsite(cli *api.API, filename, mode string) {
 		{"源IP获取方式", "detector_ip_source"},
 		{"代理IP或者IP组ID", "proxy_ip_list_or_proxy_group"},
 	}
+	if v25 {
+		headers = insertIPSourceFromHeader(headers)
+	}
 	var h1, h2 []string
 	for _, v := range headers {
 		h1 = append(h1, v[0])
@@ -48,15 +74,12 @@ func exportTransparentBridgeWebsite(cli *api.API, filename, mode string) {
 	panicIf(w.Write(h1))
 	panicIf(w.Write(h2))
 
-	b, err := getWebsite(cli, mode)
-	panicIf(err)
 	rsp := &TransparentBridgWebsiteResp{}
 	panicIf(json.Unmarshal(b, rsp))
 	var data [][]string
-	length := len(rsp.Data)
-	for i := length - 1; i >= 0; i-- {
+	for i := len(rsp.Data) - 1; i >= 0; i-- {
 		v := rsp.Data[i]
-		data = append(data, []string{
+		row := []string{
 			intToString(v.AssetGroup),
 			boolToString(v.IsEnabled),
 			v.Name,
@@ -64,6 +87,11 @@ func exportTransparentBridgeWebsite(cli *api.API, filename, mode string) {
 			listToString(v.ServerNames),
 			intToString(v.PolicyGroup),
 			v.Remark,
+		}
+		if v25 {
+			row = append(row, v.DetectorIPSourceFrom)
+		}
+		row = append(row,
 			listToString(v.DetectorIPSource),
 			func(v1 []string, v2 []int) string {
 				s1 := listToString(v1)
@@ -72,12 +100,18 @@ func exportTransparentBridgeWebsite(cli *api.API, filename, mode string) {
 				}
 				return intListToString(v2)
 			}(v.ProxyIPList, v.ProxyIPGroups),
-		})
+		)
+		data = append(data, row)
 	}
 	panicIf(w.WriteAll(data))
 }
 
 func exportTransparentProxyWebsite(cli *api.API, filename, mode string) {
+	b, err := getWebsite(cli, mode)
+	panicIf(err)
+
+	v25 := hasDetectorIPSourceFrom(b)
+
 	f, w := openFile(cli, filename)
 	defer f.Close()
 	defer w.Flush()
@@ -99,6 +133,9 @@ func exportTransparentProxyWebsite(cli *api.API, filename, mode string) {
 		{"代理IP或者IP组ID", "proxy_ip_list_or_proxy_group"},
 		{"访问日志设置", "access_log"},
 	}
+	if v25 {
+		headers = insertIPSourceFromHeader(headers)
+	}
 	var h1, h2 []string
 	for _, v := range headers {
 		h1 = append(h1, v[0])
@@ -107,8 +144,6 @@ func exportTransparentProxyWebsite(cli *api.API, filename, mode string) {
 	panicIf(w.Write(h1))
 	panicIf(w.Write(h2))
 
-	b, err := getWebsite(cli, mode)
-	panicIf(err)
 	rsp := &TransparentProxyWebsiteResp{}
 	panicIf(json.Unmarshal(b, rsp))
 	var data [][]string
@@ -121,7 +156,7 @@ func exportTransparentProxyWebsite(cli *api.API, filename, mode string) {
 	for i := length - 1; i >= 0; i-- {
 		v := rsp.Data[i]
 		var nonHttp, isSsl, isSni, isHttp2 bool
-		data = append(data, []string{
+		row := []string{
 			intToString(v.AssetGroup),
 			boolToString(v.IsEnabled),
 			v.Name,
@@ -143,6 +178,11 @@ func exportTransparentProxyWebsite(cli *api.API, filename, mode string) {
 			boolToString(isHttp2),
 			boolToString(isSni),
 			v.Remark,
+		}
+		if v25 {
+			row = append(row, v.DetectorIPSourceFrom)
+		}
+		row = append(row,
 			listToString(v.DetectorIPSource),
 			func(v1 []string, v2 []int) string {
 				s1 := listToString(v1)
@@ -152,12 +192,18 @@ func exportTransparentProxyWebsite(cli *api.API, filename, mode string) {
 				return intListToString(v2)
 			}(v.ProxyIPList, v.ProxyIPGroups),
 			dumpJson(v.AccessLog),
-		})
+		)
+		data = append(data, row)
 	}
 	panicIf(w.WriteAll(data))
 }
 
 func exportHardwareReverseProxyWebsite(cli *api.API, filename, mode string) {
+	b, err := getWebsite(cli, mode)
+	panicIf(err)
+
+	v25 := hasDetectorIPSourceFrom(b)
+
 	f, w := openFile(cli, filename)
 	defer f.Close()
 	defer w.Flush()
@@ -188,6 +234,9 @@ func exportHardwareReverseProxyWebsite(cli *api.API, filename, mode string) {
 		{"保持连接配置", "keepalive_config"},
 		{"业务服务器获取源IP XFF 配置", "x_forwarded_for_action"},
 	}
+	if v25 {
+		headers = insertIPSourceFromHeader(headers)
+	}
 	var h1, h2 []string
 	for _, v := range headers {
 		h1 = append(h1, v[0])
@@ -196,8 +245,6 @@ func exportHardwareReverseProxyWebsite(cli *api.API, filename, mode string) {
 	panicIf(w.Write(h1))
 	panicIf(w.Write(h2))
 
-	b, err := getWebsite(cli, mode)
-	panicIf(err)
 	rsp := &HardwareReverseProxyWebsiteResp{}
 	panicIf(json.Unmarshal(b, rsp))
 	var data [][]string
@@ -214,7 +261,7 @@ func exportHardwareReverseProxyWebsite(cli *api.API, filename, mode string) {
 			continue
 		}
 		var nonHttp, isSsl, isSni, isHttp2 bool
-		data = append(data, []string{
+		row := []string{
 			intToString(v.AssetGroup),
 			boolToString(v.IsEnabled),
 			v.Name,
@@ -255,6 +302,11 @@ func exportHardwareReverseProxyWebsite(cli *api.API, filename, mode string) {
 			listToString(v.IP),
 			intToString(v.PolicyGroup),
 			v.Remark,
+		}
+		if v25 {
+			row = append(row, v.DetectorIPSourceFrom)
+		}
+		row = append(row,
 			listToString(v.DetectorIPSource),
 			func(v1 []string, v2 []int) string {
 				s1 := listToString(v1)
@@ -271,7 +323,8 @@ func exportHardwareReverseProxyWebsite(cli *api.API, filename, mode string) {
 			dumpJson(v.BackendConfig.HeaderConfig),
 			v.BackendConfig.KeepaliveConfig,
 			v.BackendConfig.XForwardedForAction,
-		})
+		)
+		data = append(data, row)
 	}
 	panicIf(w.WriteAll(data))
 }

@@ -21,6 +21,7 @@ import (
 var DEBUG bool
 
 func CreateTransparentBridgeWebsite(cli *tbridge.API, data *tbridge.Data) (b []byte, err error) {
+	data.DetectorIPSourceFrom = "" // only used for updates
 	b, err = cli.Create(data)
 	if ok, e := api.OK2(b, err); !ok {
 		err = fmt.Errorf("failed to init website: %s", e)
@@ -76,6 +77,7 @@ func parseTransparentBridgeCsvRow(record []string, H map[string]int) *tbridge.Da
 	ret.ServerNames = stringToList(record[H["server_names"]])
 	ret.PolicyGroup = stringToInt(record[H["policy_group"]])
 	ret.Remark = strip(record[H["remark"]])
+	ret.DetectorIPSourceFrom = strip(record[H["detector_ip_source_from"]])
 	ret.IPSource = genIPSource(record[H["detector_ip_source"]], record[H["proxy_ip_list_or_proxy_group"]])
 	return ret
 }
@@ -113,6 +115,7 @@ func genIPSource(source, proxyIp string) *website.IPSource {
 }
 
 func CreateHardwareReverseProxyWebsite(cli *hproxy.API, data *hproxy.Data) (b []byte, err error) {
+	data.DetectorIPSourceFrom = "" // only used for updates
 	b, err = cli.Create(data)
 	if ok, e := api.OK2(b, err); !ok {
 		err = fmt.Errorf("failed to init website: %s", e)
@@ -168,6 +171,7 @@ func parseHardwareReverseProxyCsvRow(record []string, H map[string]int) *hproxy.
 	ret.IP = stringToList(record[H["ip"]])
 	ret.PolicyGroup = stringToInt(record[H["policy_group"]])
 	ret.Remark = strip(record[H["remark"]])
+	ret.DetectorIPSourceFrom = strip(record[H["detector_ip_source_from"]])
 	ret.IPSource = genIPSource(record[H["detector_ip_source"]], record[H["proxy_ip_list_or_proxy_group"]])
 	return ret
 }
@@ -230,6 +234,7 @@ func genBackendConfig(config []string) hproxy.BackendConfig {
 }
 
 func CreateTransparentProxyWebsite(cli *tproxy.API, data *tproxy.Data) (b []byte, err error) {
+	data.DetectorIPSourceFrom = "" // only used for updates
 	b, err = cli.Create(data)
 	if ok, e := api.OK2(b, err); !ok {
 		err = fmt.Errorf("failed to init website: %s", e)
@@ -285,6 +290,7 @@ func parseTransparentProxyCsvRow(record []string, H map[string]int) *tproxy.Data
 		ret.SslCert = stringToInt(record[H["ssl_cert"]])
 	}
 	ret.Remark = strip(record[H["remark"]])
+	ret.DetectorIPSourceFrom = strip(record[H["detector_ip_source_from"]])
 	ret.IPSource = genIPSource(record[H["detector_ip_source"]], record[H["proxy_ip_list_or_proxy_group"]])
 	return ret
 }

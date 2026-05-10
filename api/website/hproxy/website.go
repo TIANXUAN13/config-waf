@@ -40,6 +40,8 @@ type Data struct {
 	URLPaths        []URLPaths      `json:"url_paths,omitempty"`        // 23+
 	SelectedTengine SelectedTengine `json:"selected_tengine,omitempty"` // 23+
 
+	DetectorIPSourceFrom string `json:"detector_ip_source_from,omitempty"` // 25.03.005+
+
 	// PUT
 	DetectorIPSource []string `json:"detector_ip_source"`
 	ProxyIPList      []string `json:"proxy_ip_list"`
